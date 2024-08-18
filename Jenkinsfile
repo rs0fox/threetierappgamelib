@@ -3,29 +3,74 @@ pipeline {
 
     environment {
         DOCKER_IMAGE = 'your-dockerhub-username/game-library-app:latest'
-        DOCKER_CREDENTIALS_ID = 'docker-credentials'  // The ID of your Docker credentials in Jenkins
+        AWS_REGION = "us-east-1"   // Update with your region
     }
 
     stages {
-        stage('Build Docker Image') {
+        stage('Checkout Code') {
             steps {
                 script {
-                    sh '''
-                        docker build -t ${DOCKER_IMAGE} .
-                    '''
+                    // Using the GitHub credentials stored in Jenkins
+                    git credentialsId: 'git-hub', url: 'https://github.com/your-repo-url.git'
                 }
             }
         }
 
-        stage('Push to Docker Hub') {
+        stage('Terraform Init') {
+            environment {
+                AWS_ACCESS_KEY_ID = credentials('aws').accessKey
+                AWS_SECRET_ACCESS_KEY = credentials('aws').secretKey
+            }
             steps {
                 script {
-                    withCredentials([usernamePassword(credentialsId: DOCKER_CREDENTIALS_ID, usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
-                        sh '''
-                            echo $DOCKER_PASSWORD | docker login --username $DOCKER_USERNAME --password-stdin
-                            docker push ${DOCKER_IMAGE}
-                        '''
+                    dir('terraform') {
+                        sh 'terraform init'
                     }
+                }
+            }
+        }
+
+        stage('Terraform Plan') {
+            steps {
+                script {
+                    dir('terraform') {
+                        sh 'terraform plan'
+                    }
+                }
+            }
+        }
+
+        stage('Terraform Apply') {
+            steps {
+                script {
+                    dir('terraform') {
+                        sh 'terraform apply -auto-approve'
+                    }
+                }
+            }
+        }
+
+        stage('Update kubeconfig') {
+            steps {
+                script {
+                    sh "aws eks --region ${AWS_REGION} update-kubeconfig --name game-library-cluster"
+                }
+            }
+        }
+
+        stage('Build and Push Docker Image') {
+            environment {
+                DOCKER_USERNAME = credentials('jenkins-docker').username
+                DOCKER_PASSWORD = credentials('jenkins-docker').password
+            }
+            steps {
+                script {
+                    sh '''
+                        echo $DOCKER_PASSWORD | docker login --username $DOCKER_USERNAME --password-stdin
+                        docker build -t ${DOCKER_IMAGE} .
+                        docker tag ${DOCKER_IMAGE} ${DOCKER_IMAGE}
+                        docker push ${DOCKER_IMAGE}
+                    '''
                 }
             }
         }
@@ -33,10 +78,8 @@ pipeline {
         stage('Deploy to Kubernetes') {
             steps {
                 script {
-                    sh '''
-                        kubectl apply -f kubernetes/deployment.yaml
-                        kubectl apply -f kubernetes/service.yaml
-                    '''
+                    sh 'kubectl apply -f kubernetes/deployment.yaml'
+                    sh 'kubectl apply -f kubernetes/service.yaml'
                 }
             }
         }
