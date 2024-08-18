@@ -10,8 +10,8 @@ pipeline {
         stage('Checkout Code') {
             steps {
                 script {
-                    // Using GitHub credentials stored in Jenkins
-                    git credentialsId: 'git-hub', url: 'https://github.com/rs0fox/threetierappgamelib.git'
+                    // No credentials needed for public repositories
+                    git url: 'https://github.com/rs0fox/threetierappgamelib.git'
                 }
             }
         }
