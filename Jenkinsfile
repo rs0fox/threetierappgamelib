@@ -3,23 +3,23 @@ pipeline {
 
     environment {
         DOCKER_IMAGE = 'your-dockerhub-username/game-library-app:latest'
-        AWS_REGION = "us-east-1"   // Update with your region
+        AWS_REGION = "us-east-1"   // Update with your AWS region
     }
 
     stages {
         stage('Checkout Code') {
             steps {
                 script {
-                    // Using the GitHub credentials stored in Jenkins
-                    git credentialsId: 'git-hub', url: 'https://github.com/your-repo-url.git'
+                    // Using GitHub credentials stored in Jenkins
+                    git credentialsId: 'git-hub', url: 'https://github.com/rs0fox/threetierappgamelib.git'
                 }
             }
         }
 
         stage('Terraform Init') {
             environment {
-                AWS_ACCESS_KEY_ID = credentials('aws').accessKey
-                AWS_SECRET_ACCESS_KEY = credentials('aws').secretKey
+                AWS_ACCESS_KEY_ID = credentials('aws').username
+                AWS_SECRET_ACCESS_KEY = credentials('aws').password
             }
             steps {
                 script {
